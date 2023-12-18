@@ -3,7 +3,6 @@ ftpath = '/home/fsandhaeger/matlab/fieldtrip-20231025/'; % change to your fieldt
 addpath(ftpath);
 ft_defaults
 
-
 dsfile = '/home/fsandhaeger/projects/fs_preproc_meg/example_data/meg_example.ds';
 bhvfile  = '/home/fsandhaeger/projects/fs_preproc_meg/example_data/bhv_example.mat';
 
@@ -370,6 +369,100 @@ ylabel('time in s');
 title('contrast cross time');
 colorbar;
 
+%% source reconstruction
+
+file_mri = [ftpath 'template/anatomy/single_subj_T1.nii'];
+[vol, grad, grid, segmentedmri, leadfield, mri] = fs_coregister_meg_mri_leadfield(file_mri,dsfile);
+
+% compute covariance matrix of data
+C = double(reshape(dat,size(dat,1),[])*reshape(dat,size(dat,1),[])');
+
+% compute filter
+cfg_src = []; cfg_src.pow = 0; cfg_src.combine = 1;
+source = fs_beamform(cfg_src,C,leadfield);
+
+% apply filter to data (multiply them)
+dat_long = reshape(dat,size(dat,1),[]);
+dat_src_long = nan(length(source.pow),3,size(dat_long,2));
+for sIDX=1:length(source.pow),
+    dat_src_long(sIDX,:,:) =  squeeze(source.filt_raw(:,:,sIDX))*dat_long;
+end
+
+% data now has 3 directions per source (i.e. N_sources*3 channels)
+label = {};
+dat_src = [];
+for dirIDX=1:size(dat_src_long,2),
+    for srcIDX=1:size(dat_src_long,1),
+        dat_src(end+1,:,:) = dat_src_long(srcIDX,dirIDX,:);
+        label{end+1} = [num2str(srcIDX) '_' num2str(dirIDX)];
+    end
+end
+
+dat_src = reshape(dat_src,size(dat_src,1),size(dat,2),size(dat,3));
+
+% decode on the source level - whole brain
+cfg = [];
+cfg.trialinfo = trialinfo;
+cfg.varsDec = {'coh';'ctr'};
+cfg.nfold = 2;
+cfg.tCov = 1:prestim;
+cfg.avgCov = 1;
+cfg.pca = 100; % we need to reduce dimensionality now, as we have too many channels!
+cfg.pca_foldwise = 1;
+
+[D_src params] = fs_cvmanova(cfg,dat_src);
+
+figure;
+
+% plot
+cfg_plot = [];
+ll=[];
+cfg_plot.params = params;
+cfg_plot.var = {'coh'};
+cfg_plot.time = data_dec.time{1};
+cfg_plot.color = [0.8 0.2 0.2];
+ll(1)=fs_cvmanova_plot(cfg_plot,D_src);
+hold on;
+cfg_plot.var = {'ctr'};
+cfg_plot.color = [0.2 0.2 0.8];
+ll(2)=fs_cvmanova_plot(cfg_plot,D_src);
+
+xlim([cfg_plot.time(1) cfg_plot.time(end)]);
+plot([cfg_plot.time(1) cfg_plot.time(end)],[0 0],'k--');
+legend(ll,{'coh';'ctr'});
+xlabel('time in s');
+ylabel('neural information (D)');
+title('source level within time');
 
 
+% define neighbours for searchlight analysis. for each source, we take the
+% source itself and its direct neighbours in all 3 directions.
+load('shell457.mat');
+nbs = shell.neighbour;
+for nbIDX=1:length(shell.neighbour), nbs{nbIDX}(end+1) = nbIDX; end;
+for nbIDX=1:length(shell.neighbour), nbs{nbIDX} = cat(1,nbs{nbIDX},nbs{nbIDX}+457,nbs{nbIDX}+457*2); end;
 
+% decode on the source level - searchlight
+cfg = [];
+cfg.trialinfo = trialinfo;
+cfg.varsDec = {'coh';'ctr'};
+cfg.nfold = 2;
+cfg.tCov = 1:prestim;
+cfg.avgCov = 1;
+cfg.searchlight = 1;
+cfg.neighbours = nbs;
+
+[D params] = fs_cvmanova(cfg,dat_src);
+
+% plot distribution of information on the source level
+D = squeeze(mean(D,15));
+
+figure;
+subplot(1,2,1);
+scatter3(shell.pos(:,1),shell.pos(:,2),shell.pos(:,3),80,squeeze(mean(D(:,1,:))),'filled');
+title(cfg.varsDec{1});
+axis equal
+subplot(1,2,2);
+scatter3(shell.pos(:,1),shell.pos(:,2),shell.pos(:,3),80,squeeze(mean(D(:,2,:))),'filled');
+title(cfg.varsDec{2});
+axis equal
