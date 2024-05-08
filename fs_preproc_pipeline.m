@@ -3,11 +3,13 @@ ftpath = '/home/fsandhaeger/matlab/fieldtrip-20231025/'; % change to your fieldt
 addpath(ftpath);
 ft_defaults
 
-dsfile = '/home/fsandhaeger/projects/fs_preproc_meg/example_data/meg_example.ds';
-bhvfile  = '/home/fsandhaeger/projects/fs_preproc_meg/example_data/bhv_example.mat';
+datapath = '/home/fsandhaeger/projects/fs_preproc_meg/example_data/';
+
+dsfile = [datapath 'meg_example.ds'];
+bhvfile  = [datapath 'bhv_example.mat'];
 
 % change to your meg data file
-hdr=ft_read_header(dsfile);
+hdr = ft_read_header(dsfile);
 
 %% double check that the recording was continuous and no gaps exist
 dt_clock = ft_read_data(dsfile,'chanindx',find(strcmp(hdr.label,'SCLK01')));
@@ -373,6 +375,13 @@ colorbar;
 
 file_mri = [ftpath 'template/anatomy/single_subj_T1.nii'];
 [vol, grad, grid, segmentedmri, leadfield, mri] = fs_coregister_meg_mri_leadfield(file_mri,dsfile);
+
+% if you want to re-use the same mri (fiducial etc) for several subjects / sessions:
+% 1. save processed mri after first participant:
+file_mri = [datapath 'mri_processed.mat'];
+save(file_mri,'mri');
+% 2. for all other participants, use the processed mri
+[vol, grad, grid, segmentedmri, leadfield, mri] = fs_coregister_meg_mri_leadfield(file_mri,dsfile,[],[],[],file_mri);
 
 % compute covariance matrix of data
 C = double(reshape(dat,size(dat,1),[])*reshape(dat,size(dat,1),[])');
