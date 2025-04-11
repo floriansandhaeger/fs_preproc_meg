@@ -31,6 +31,9 @@ cfg_load.dataset = dsfile;
 cfg_load.continuous = 'yes';
 data = ft_preprocessing(cfg_load);
 
+% 3rd order gradiometer denoising. if this doesn't work, try 'G2BR'. otherwise it's
+% also ok without this step, but it helps remove external noise and reduce drifts.
+
 cfg_denoise = [];
 cfg_denoise.gradient = 'G3BR';
 data = ft_denoise_synthetic(cfg_denoise,data);
