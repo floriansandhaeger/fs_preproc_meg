@@ -31,6 +31,10 @@ cfg_load.dataset = dsfile;
 cfg_load.continuous = 'yes';
 data = ft_preprocessing(cfg_load);
 
+cfg_denoise = [];
+cfg_denoise.gradient = 'G3BR';
+data = ft_denoise_synthetic(cfg_denoise,data);
+
 % B) if that for some reason doesn't work well, use a more basic function
 % dat = ft_read_data(dsfile);
 % data = [];
