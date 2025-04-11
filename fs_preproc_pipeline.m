@@ -271,6 +271,11 @@ dat = reshape(cell2mat(data_dec.trial),length(data_dec.label),size(data_dec.tria
 % low frequency broadband signals), but this would be a simple way
 % to identify noisy data. the threshold used here is just a suggestion -
 % depends on the data and noise level.
+% if you suspect that your signal of interest might be confounded by a
+% specific source of noise (e.g. eye movements, heartebeat, respiration, ...),
+% it may be a good idea to use more extensive cleaning approaches:
+% manual rejection based on visual inspection, automatic detection of artefacts,
+% rejection of ICA components associated with eye movements, heart or muscles, ...
 
 dat_var = squeeze(var(dat,[],2));
 var_trials = mean(dat_var,1);
